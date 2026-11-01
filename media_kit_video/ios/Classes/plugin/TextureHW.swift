@@ -183,6 +183,16 @@ public class TextureHW: NSObject, FlutterTexture, ResizableTextureProtocol {
     textureContexts.pushAsReady(textureContext!)
   }
 
+  public func waitForRendering() {
+    EAGLContext.setCurrent(context)
+    defer {
+      OpenGLESHelpers.checkError("waitForRendering")
+      EAGLContext.setCurrent(nil)
+    }
+
+    glFinish()
+  }
+
   static private func getProcAddress(
     _ ctx: UnsafeMutableRawPointer?,
     _ name: UnsafePointer<Int8>?

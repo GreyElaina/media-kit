@@ -35,6 +35,8 @@ public class VideoOutput: NSObject {
   private var textureId: Int64 = -1
   private var currentSize: CGSize = CGSize.zero
   private var disposed: Bool = false
+  private let frameObserverLock = NSLock()
+  private var frameObserver: VideoFrameObservers.Observer?
 
   init(
     handle: Int64,
@@ -127,6 +129,7 @@ public class VideoOutput: NSObject {
   private func registerTextureId() {
     // Textures must be registered on the platform thread.
     textureId = registry.register(texture)
+    VideoFrameObservers.add(self, textureId: textureId)
     // textureUpdateCallback must run on the main thread
     textureUpdateCallback(textureId, CGSize(width: 0, height: 0))
   }
@@ -135,6 +138,7 @@ public class VideoOutput: NSObject {
     let registry_ = self.registry
     let textureId_ = self.textureId
     textureId = -1
+    VideoFrameObservers.remove(textureId: textureId_)
     DispatchQueue.main.async {
       // Textures must be unregistered on the platform thread
       registry_.unregisterTexture(textureId_)
@@ -174,6 +178,37 @@ public class VideoOutput: NSObject {
       guard let that = self else { return }
       // Textures must be marked as available from the main thread
       that.registry.textureFrameAvailable(that.textureId)
+    }
+
+    notifyFrameObserver()
+  }
+
+  func setFrameObserver(_ observer: VideoFrameObservers.Observer?) {
+    frameObserverLock.lock()
+    frameObserver = observer
+    frameObserverLock.unlock()
+  }
+
+  func requestFrame() {
+    worker.enqueue {
+      self.notifyFrameObserver()
+    }
+  }
+
+  // Must be run on the worker, which is the only one to render into the pixel
+  // buffers, so that the current one isn't modified while it is observed.
+  private func notifyFrameObserver() {
+    frameObserverLock.lock()
+    let observer = frameObserver
+    frameObserverLock.unlock()
+
+    guard let observer = observer, let texture = texture, !disposed else {
+      return
+    }
+
+    texture.waitForRendering()
+    if let pixelBuffer = texture.copyPixelBuffer()?.takeRetainedValue() {
+      observer(pixelBuffer)
     }
   }
 

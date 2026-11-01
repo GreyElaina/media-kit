@@ -29,6 +29,12 @@ public class SafeResizableTexture:
     }
   }
 
+  public func waitForRendering() {
+    return locked {
+      return child.waitForRendering()
+    }
+  }
+
   public func copyPixelBuffer() -> Unmanaged<CVPixelBuffer>? {
     return child.copyPixelBuffer()
   }

@@ -99,6 +99,10 @@ public class TextureSW: NSObject, FlutterTexture, ResizableTextureProtocol {
     textureContexts.reinit(objects: [], skipCheckArgs: true)
   }
 
+  public func waitForRendering() {
+    // Rendered by the CPU, synchronously.
+  }
+
   public func render(_ size: CGSize) {
     let textureContext = textureContexts.nextAvailable()
     if textureContext == nil {
